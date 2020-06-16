@@ -15,7 +15,8 @@ function RedditLockscreen{
     [switch]$showpic,
     [switch]$showlog,
     [switch]$config,
-    [switch]$uninstall
+    [switch]$uninstall,
+    [switch]$help
     )
 
     # if the folder where the images will be stored does not exists, creates one
@@ -29,13 +30,14 @@ function RedditLockscreen{
     elseif ($showLog)   { Get-Content $logfile }
     elseif ($uninstall) { uninstall-RedditLockscreen -localFolder $localFolder}
     elseif ($config)    { Invoke-Item $cfgfile }
+    elseif ($help)      {funHelp}
     else {
         # finds a post to use as lock screen
         Write-Host "fetching a post"
 
         # if no subreddits where specified, loads the config
         $cfg = Get-Content $cfgfile | ConvertFrom-Json;
-        if($subreddits -eq @()){$subreddits = $cfg.subreddits;}
+        if($subreddits.Length -eq 0){$subreddits = $cfg.subreddits;}
         if($null -eq $nsfw){$nsfw = $cfg.nsfw;}
         if($null -eq $sort){$sort = $cfg.sort;}
 
@@ -121,12 +123,31 @@ function install-RedditLockscreen {
     )
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){
 
-        $divider = "`n" + ("-" * (Get-Host).ui.rawui.windowsize.width) + "`n"; # trick to make a row of dashes the width of the window
-        write-host ($divider) -foregroundColor "yellow"
-        Write-Host "This will install RedditLockscreen on your machine and it will download a random reddit login screen every day" -ForegroundColor DarkYellow
-        Write-Host "Note that the contents of the pictures are beyond the control of the developer, and may be " -NoNewline -ForegroundColor DarkYellow
-        Write-Host "unsafe for work." -ForegroundColor DarkYellow -BackgroundColor DarkRed
-        write-host ($divider) -foregroundColor "yellow"
+        $str = @('
+
+
+        8888888b.               888      888 d8b 888         888888b.                     888                                                      888
+        888   Y88b              888      888 Y8P 888         888  "88b                    888                                                      888
+        888    888              888      888     888         888  .88P                    888                                                      888
+        888   d88P .d88b.   .d88888  .d88888 888 888888      8888888K.   8888b.   .d8888b 888  888  .d88b.  888d888 .d88b.  888  888 88888b.   .d88888 .d8888b
+        8888888P" d8P  Y8b d88" 888 d88" 888 888 888         888  "Y88b     "88b d88P"    888 .88P d88P"88b 888P"  d88""88b 888  888 888 "88b d88" 888 88K
+        888 T88b  88888888 888  888 888  888 888 888         888    888 .d888888 888      888888K  888  888 888    888  888 888  888 888  888 888  888 "Y8888b.
+        888  T88b Y8b.     Y88b 888 Y88b 888 888 Y88b.       888   d88P 888  888 Y88b.    888 "88b Y88b 888 888    Y88..88P Y88b 888 888  888 Y88b 888      X88
+        888   T88b "Y8888   "Y88888  "Y88888 888  "Y888      8888888P"  "Y888888  "Y8888P 888  888  "Y88888 888     "Y88P"   "Y88888 888  888  "Y88888  88888P"
+                                                                                                        888
+                                                                                                   Y8b d88P
+                                                                                                    "Y88P"
+        ')
+        Write-Host $str -ForegroundColor Green
+        #write-host ("Author: Garfield1002")
+        write-host ("Source Code: https://github.com/Garfield1002/redditPic")
+        Write-Host
+        Write-Host ("This script will install RedditLockscreen on your machine and will download random reddit login screens for you")-ForegroundColor 2
+        Write-Host ("Once installed, use the command ") -ForegroundColor 2 -NoNewline
+        Write-Host ("RedditLockscreen -help") -BackgroundColor DarkGray -NoNewline
+        Write-Host (" for help") -ForegroundColor 2
+        Write-Host ("These images are downloaded directly from reddit so use at your own risk") -ForegroundColor 2
+        Write-Host
 
         # define the workstation unlock as the trigger
         $trigger = New-ScheduledTaskTrigger -Daily -At 12pm;
@@ -163,7 +184,7 @@ function install-RedditLockscreen {
             throw "Installation failed"
         }
     }  else {
-        Write-Host "You need run this script as an Admin to install it" -BackgroundColor Red -ForegroundColor Yellow
+        Write-Host "You need run this script as an Admin to install it" -ForegroundColor Red
         throw "Call an admin"
     }
 }
@@ -184,12 +205,12 @@ function uninstall-RedditLockscreen {
         # Manually removes the module
         $scriptPath = (get-item $myInvocation.ScriptName).Directory
         if ($scriptPath.name -eq "RedditLockscreen"){
-            Write-host "You have to manually remove the module now. Just delete the RedditLockscreen folder." -BackgroundColor Yellow -ForegroundColor Red
+            Write-host "You have to manually remove the module now. Just delete the RedditLockscreen folder." -ForegroundColor Red
             Invoke-Item $scriptPath;
         }
     } else {
         # user is missing admin rights
-        Write-host "You need administrator rights to uninstall this script" -BackgroundColor Red -ForegroundColor Yellow
+        Write-host "You need administrator rights to uninstall this script" -ForegroundColor Red
         throw "Call an admin!"
     }
 
@@ -233,6 +254,22 @@ function logger  {
         if (! (test-path $logfile )){set-content $logfile "Reddit Lock Log"}
         add-content $logfile ("" + $date + ": " + $msg)
     }
+}
+
+function funHelp {
+    Write-Host('Usage: RedditLockscreen [-help] [-install] [-showpic] [-showlog] [-config] [-uninstall] [-subreddits] [-sort] [-nsfw]')
+    Write-Host('No args         Fetches a lockscreen image on reddit')
+    Write-Host('-help           Dislay help')
+    Write-Host('-install        Installs the RedditLockscreen script')
+    Write-Host('-showpic        Display the current lockscreen')
+    Write-Host('-showlog        Display the log')
+    Write-Host('-config         Opens the configuration file')
+    Write-Host('-uninstall      Uninstalls the RedditLockscreen script')
+    Write-Host('-subreddits     Specify which subreddits to pick from')
+    Write-Host('-sort           Specify reddit''s sorting method')
+    Write-Host('-nsfw           Specify if nfsw content should be used')
+    Write-Host
+    Write-Host('For more information, feel free to go read the README.md at https://github.com/Garfield1002/redditPic/README.MD')
 }
 
 Export-ModuleMember -Function RedditLockscreen;
