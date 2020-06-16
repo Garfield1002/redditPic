@@ -1,95 +1,76 @@
-# This code is VERY VERY VERY heavily based on Great Dismal (https://blob.pureandapplied.com.au/greatdismal/)
+# This code is VERY heavily based on Great Dismal (https://blob.pureandapplied.com.au/greatdismal/)
 # Check out stibinator's original work on github: https://github.com/stibinator/GreatDismal
 
 
-function get-RedditLockscreen{
+# The main function
+function RedditLockscreen{
     param (
     [string[]]$subreddits = @(),
-    [string]$redditpicFolder = (join-path $env:APPDATA "\reddit_backgrounds\"),
-    [int]$nsfw = 0,
-    [string]$sort = "new",
-    [string]$logfile = (join-path $redditpicFolder "log.txt"),
-    [string]$cfgfile = (join-path $redditpicFolder "config.json"),
+    [int]$nsfw,
+    [string]$sort,
+    [string]$localFolder = (join-path $env:APPDATA "\Reddit backgrounds\"),
+    [string]$logfile = (join-path $localFolder "log.txt"),
+    [string]$cfgfile = (join-path $localFolder "config.json"),
+    [switch]$install,
     [switch]$showpic,
     [switch]$showlog,
     [switch]$config,
     [switch]$uninstall
     )
 
-    # do the stuffs
-    # installation hoo-hah
-    if (! (test-path $redditpicFolder)){mkdir $redditpicFolder}
+    # if the folder where the images will be stored does not exists, creates one
+    if (! (test-path $localFolder)){mkdir $localFolder}
+    # if the config file is missing initializes a new one
     if (! (test-path $cfgfile)){set-content $cfgfile '{ "subreddits":["wallpaper"], "nsfw":0, "sort":"new" }'}
-    $redditPic = Join-Path $redditpicFolder "redditPic.jpg"
+    $redditPic = Join-Path $localFolder "redditPic.jpg"
 
-    if ($install){
-        install-RedditLockscreen -subreddits $subreddits -redditpicFolder $redditpicFolder -scriptPath $scriptPath -nsfw $nsfw;
-    } elseif ($showpic) {
-        #user wants to see the current pic
-        Invoke-Item $redditPic
-    } elseif ($showLog){
-        #user wants to see the log
-        Get-Content $logfile
-    } elseif ($uninstall){
-        #user wants to see the log
-        uninstall-RedditLockscreen -redditpicFolder $redditpicFolder;
-    } elseif ($config){
-        #user wants to see the log
-        Invoke-Item $cfgfile;
-    }else {
-        #get the pic and set the screen
-        if($subreddits -eq @()){
-            $cfg = Get-Content $cfgfile | ConvertFrom-Json;
-            $subreddits = $cfg.subreddits;
-            $nsfw = $cfg.nsfw;
-            $sort = $cfg.sort;
-        }
-        get-redditPicFortheDay -subreddits $subreddits -redditPic $redditPic -nsfw $nsfw -logfile $logfile -sort $sort;
-    }
-}
+    if ($install)       { install-RedditLockscreen }
+    elseif ($showpic)   { Invoke-Item $redditPic }
+    elseif ($showLog)   { Get-Content $logfile }
+    elseif ($uninstall) { uninstall-RedditLockscreen -localFolder $localFolder}
+    elseif ($config)    { Invoke-Item $cfgfile }
+    else {
+        # finds a post to use as lock screen
+        Write-Host "fetching a post"
 
-function get-redditPicFortheDay {
-    param (
-    [string[]]$subreddits = @(),
-    [string]$redditPic,
-    [int]$nsfw = 0,
-    [string]$logfile,
-    [string]$sort
-    )
-    Write-Host "getting a new background"
+        # if no subreddits where specified, loads the config
+        $cfg = Get-Content $cfgfile | ConvertFrom-Json;
+        if($subreddits -eq @()){$subreddits = $cfg.subreddits;}
+        if($null -eq $nsfw){$nsfw = $cfg.nsfw;}
+        if($null -eq $sort){$sort = $cfg.sort;}
 
-    if ($subreddits.Length -eq 0){
-        $subreddits = @(
-        "wallpaper"
-        );
-    }
-    $subredditfortheday = $subreddits[(Get-Random($subreddits.Length))];
-    $result = Invoke-RestMethod -URi  ("https://www.reddit.com/r/{0}/{1}.json?limit=10" -f $subredditfortheday, $sort) -Method Get;
-    $result = $result.data.children | Sort-Object {Get-Random};
+        # chooses a random subreddit to load the post from
+        $subredditfortheday = $subreddits[(Get-Random($subreddits.Length))];
 
-    write-Log ("looking for pics on {0}, found {1}" -f $subredditfortheday,  $result.length) -logFile $logfile
+        # shuffles the 10 first results
+        $result = Invoke-RestMethod -URi  ("https://www.reddit.com/r/{0}/{1}.json?limit=10" -f $subredditfortheday, $sort) -Method Get;
+        $result = $result.data.children | Sort-Object {Get-Random};
 
-    foreach ($child in $result){
-        $post = $child.data
-        if ((! $post.over_18) -or $nsfw){
-            if($post.post_hint = "image"){
-                $photoURL = $post.url;
-                $photoTitle = $post.title;
-                $photoAuthor= $post.author;
-                break;
+        foreach ($child in $result){
+            $post = $child.data
+            # checks if the user accepts nsfw content
+            if ((! $post.over_18) -or $nsfw){
+                if($post.post_hint = "image"){
+                    # saves the information from th future lock screen
+                    $photoURL = $post.url;
+                    $photoTitle = $post.title;
+                    $photoAuthor= $post.author;
+                    break;
+                }
             }
         }
+        if ($photoURL){
+            Write-Host ("Attempting to download at: {0}" -f $photoURL);
+            # downloads the picture
+            (New-Object Net.webclient).DownloadFile($photoURL, $redditPic);
+            # sets the lockscreen wallpaper
+            Set-LockscreenWallpaper -LockScreenImageValue $redditPic;
+            logger ("Sucessfully downloaded `"{0}`" at {1} posted by {2} on {3}" -f $photoTitle, $photoURL, $photoAuthor, $subredditfortheday) -logFile $logfile;
+        }
+        else {
+            Write-Host ("Nothing was found on {0} matching your requirements" -f $subredditfortheday);
+        }
     }
-    if ($photoURL){
-        Write-Host ("Attempting to download at: {0}" -f $photoURL);
-        (New-Object Net.webclient).DownloadFile($photoURL, $redditPic);
-        Set-LockscreenWallpaper -LockScreenImageValue $redditPic;
-        write-Log ("downloaded `"{0}`" at {1} posted by {2}" -f $photoTitle, $photoURL, $photoAuthor) -logFile $logfile;
-    }
-    else {
-        Write-Host ("Did not find anything on " -f $subredditfortheday);
-    }
-
 }
 
 function Set-LockscreenWallpaper {
@@ -135,12 +116,11 @@ function Set-LockscreenWallpaper {
 
 function install-RedditLockscreen {
     param(
-    [string]$redditpicFolder = (join-path $env:APPDATA "\reddit_backgrounds\"),
-    [string]$logfile = (join-path $env:APPDATA "\reddit_backgrounds\log.txt")
+    [string]$localFolder = (join-path $env:APPDATA "\Reddit backgrounds\"),
+    [string]$logfile = (join-path $env:APPDATA "\Reddit backgrounds\log.txt")
     )
-    # check to see if user is admin
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){
-        # is admin, we're good to install
+
         $divider = "`n" + ("-" * (Get-Host).ui.rawui.windowsize.width) + "`n"; # trick to make a row of dashes the width of the window
         write-host ($divider) -foregroundColor "yellow"
         Write-Host "This will install RedditLockscreen on your machine and it will download a random reddit login screen every day" -ForegroundColor DarkYellow
@@ -151,60 +131,70 @@ function install-RedditLockscreen {
         # define the workstation unlock as the trigger
         $trigger = New-ScheduledTaskTrigger -Daily -At 12pm;
 
-        # Create a task scheduler event
-        $argument = "-WindowStyle Hidden -command `"import-module 'RedditLockscreen'; get-RedditLockscreen -logfile {0} -redditpicFolder {1}" -f $logfile, $redditpicFolder
-        $action = New-ScheduledTaskAction -id "redditLockscreen" -execute 'Powershell.exe' -Argument $argument
-        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable
+        # create a task scheduler event
+        $argument = "-WindowStyle Hidden -command `"import-module 'RedditLockscreen'; RedditLockscreen -logfile {0} -localFolder {1}" -f $logfile, $localFolder
+
+        # prompts the user for an administrator access
         Write-Host "For this script to work it needs elevated privileges." -BackgroundColor DarkBlue
         $Credential = Test-Credential
+
         if ($Credential){
-            # actually install the shiz
             Write-Host "Username checks out." -ForegroundColor Green
-            write-Log "Unregistering existing scheduled task" -logfile $logfile
+
+            # if a previous task existed, unregisters it
+            logger "Unregistering existing scheduled task" -logfile $logfile
             Unregister-ScheduledTask -TaskName "redditLock" -ErrorAction SilentlyContinue
+
+            # adds a new task to the task scheduler which will be called whenever the user logs on
             Register-ScheduledTask `
-            -TaskName "redditLockscreen" `
-            -User $Credential.username `
-            -Action $action `
-            -Settings $settings `
-            -Trigger $trigger -RunLevel Highest `
-            -Password $Credential.GetNetworkCredential().Password `
-            -taskPath "\reddit_backgrounds\"
+            -TaskName   "redditLockscreen" `
+            -User       $Credential.username `
+            -Action     (New-ScheduledTaskAction -id "redditLockscreen" -execute 'Powershell.exe' -Argument $argument)`
+            -Settings   (New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable) `
+            -Trigger    (New-ScheduledTaskTrigger -AtLogOn) `
+            -RunLevel   Highest `
+            -Password   $Credential.GetNetworkCredential().Password `
+            -taskPath   "\Reddit backgrounds\";
+            RedditLockscreen
         }
         if ($? -and (Get-ScheduledTask -TaskName "redditLockscreen" -ErrorAction SilentlyContinue)){
-            write-Log "RedditLockscreen is installed" -colour "Green" -logFile $logfile
+            logger "RedditLockscreen has sucessfuly been installed" -colour "Green" -logFile $logfile
         } else {
-            throw "Bollocks. Something went wrong. Computers suck."
+            throw "Installation failed"
         }
     }  else {
-        # not admin
         Write-Host "You need run this script as an Admin to install it" -BackgroundColor Red -ForegroundColor Yellow
-        throw "Computer says no."
+        throw "Call an admin"
     }
 }
 
 function uninstall-RedditLockscreen {
     param(
-        [string]$redditpicFolder
+        [string]$localFolder
     )
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){
+        # reverts the changes that where done in the registry
         $RegKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
         remove-item -Path $RegKeyPath -Force -Recurse| Out-Null;
         Unregister-ScheduledTask -TaskName "redditLock" -ErrorAction SilentlyContinue;
-        Remove-Item  $redditpicFolder -Recurse -ErrorAction SilentlyContinue;
+
+        # Deletes the local folders including background, cfg and log
+        Remove-Item  $localFolder -Recurse -ErrorAction SilentlyContinue;
+
+        # Manually removes the module
         $scriptPath = (get-item $myInvocation.ScriptName).Directory
-        # remove-module doesn't seem to work for psgallery modules. So we do it manually
-        # just check that we're actually removing the greatdismal folder
         if ($scriptPath.name -eq "RedditLockscreen"){
             Write-host "You have to manually remove the module now. Just delete the RedditLockscreen folder." -BackgroundColor Yellow -ForegroundColor Red
-            Invoke-Item $scriptPath; #open the folder containing the module folder (usually ~\Documents\WindowsPowershell\Modules)
+            Invoke-Item $scriptPath;
         }
     } else {
-        Write-host "you need to run this script as admin to uninstall it" -BackgroundColor Red -ForegroundColor Yellow
-        throw "Computer says no."
+        # user is missing admin rights
+        Write-host "You need administrator rights to uninstall this script" -BackgroundColor Red -ForegroundColor Yellow
+        throw "Call an admin!"
     }
 
 }
+
 function Test-Credential {
     # check password, allowing multiple attemps
     $againWithThePassword = $true;
@@ -215,15 +205,15 @@ function Test-Credential {
     while ((! $usernameChecksOut) -and $againWithThePassword){
         $Credential = Get-Credential -ErrorAction SilentlyContinue
         if ($null -eq $Credential){
-            Write-Warning "You didn't give me any credentials. I can't help you if you won't help me."
-            $againWithThePassword = ((read-host "Again with the password? Y/n").ToLower() -ne "n")
+            Write-Warning "Please enter something"
+            $againWithThePassword = ((read-host "Try again with the password? Y/n").ToLower() -ne "n")
         } else {
             $usernameChecksOut = $DS.ValidateCredentials($Credential.UserName, $Credential.GetNetworkCredential().Password)
             if ($usernameChecksOut){
                 return $Credential
             } else {
-                Write-Warning "Username and / or password is incorrect. Soz.";
-                $againWithThePassword = ((read-host "Again with the password? Y/n").ToLower() -eq "n")
+                Write-Warning "Username and / or password is incorrect.";
+                $againWithThePassword = ((read-host "Try again with the password? Y/n").ToLower() -eq "n")
             }
         }
         if (! $againWithThePassword){
@@ -233,24 +223,16 @@ function Test-Credential {
     }
 }
 
-function write-Log  {
+function logger  {
     param (
     [string]$Msg,
-    [string]$colour = "White",
     [string]$logfile
     )
-
     if (($null -ne $logfile) -and ("" -ne $logfile)){
         $date = Get-date -f "dd/MM/yyyy HH:mm:ss"
         if (! (test-path $logfile )){set-content $logfile "Reddit Lock Log"}
-        # trim the log if it gets too long 64k is long enough right?
-        if ((get-item $logfile).length -gt 64kb){
-            # get the last 20 lines
-            $oldlog = (Get-Content $logfile)[-20..-1]
-            Set-Content $logfile ("Reddit Lock Log`n" + $date + "-> " + "Trimmed log")
-            Add-Content $logfile $oldlog
-        }
-        add-content $logfile ("" + $date + "-> " + $msg)
+        add-content $logfile ("" + $date + ": " + $msg)
     }
-    Write-Host $Msg -foregroundColor $colour
 }
+
+Export-ModuleMember -Function RedditLockscreen;
