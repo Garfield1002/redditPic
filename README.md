@@ -1,7 +1,7 @@
 # Reddit Lockscreen
 
 ![Release](https://img.shields.io/github/v/release/Garfield1002/redditPic?include_prereleases)
-![Downloads](https://img.shields.io/github/downloads/Garfield1002/redditPic?include_prereleases/total)
+![Downloads](https://img.shields.io/github/downloads/Garfield1002/redditPic/total)
 ![Liscence](https://img.shields.io/github/license/Garfield1002/redditPic)
 
 Sets images fetched on reddit as lockscreen.
@@ -33,7 +33,8 @@ Works for Windows 10 (build 1703 or later)
 ### Quick Version
 
 1. Clone the repo or download archive from [releases](https://github.com/Garfield1002/redditPic/releases)
-2. Execute in an elevated instance of `Windows PowerShell`:
+2. Execute in an elevated instance of `Windows PowerShell`: `Set-ExecutionPolicy Unrestricted`
+3. Execute in an elevated instance of `Windows PowerShell`:
 
 ```powershell
 .\installer.ps1
@@ -51,7 +52,7 @@ In the `Search Bar`, type in `PowerShell` and click on `Run As Administrator`.
 
 Once in `PowerShell`, run `Set-Location "C:\Users\ ...\Downloads\reddit pics\"` (the path to your download)
 
-Now run `.\installer.ps1`
+Now run `Set-ExecutionPolicy Unrestricted` then `.\installer.ps1`
 
 From there on, simply follow instructions.
 
