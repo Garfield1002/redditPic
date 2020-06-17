@@ -37,7 +37,7 @@ Works for Windows 10 (build 1703 or later)
 3. Execute in an elevated instance of `Windows PowerShell`:
 
 ```powershell
-.\installer.ps1
+powershell -ExecutionPolicy Bypass -File .\installer.ps1
 ```
 
 Then follow instructions.
@@ -52,7 +52,7 @@ In the `Search Bar`, type in `PowerShell` and click on `Run As Administrator`.
 
 Once in `PowerShell`, run `Set-Location "C:\Users\ ...\Downloads\reddit pics\"` (the path to your download)
 
-Now run `Set-ExecutionPolicy Unrestricted` then `.\installer.ps1`
+Now run `powershell -ExecutionPolicy Bypass -File .\installer.ps1`
 
 From there on, simply follow instructions.
 
