@@ -1,5 +1,9 @@
 # Reddit Lockscreen
 
+![Release](https://img.shields.io/github/v/release/Garfield1002/redditPic?include_prereleases)
+![Downloads](https://img.shields.io/github/downloads/Garfiled1002/https://img.shields.io/github/v/release/Garfield1002/redditPic?include_prereleases/total)
+![Liscence](https://img.shields.io/github/license/Garfiled1002/redditPic)
+
 Sets images fetched on reddit as lockscreen.
 
 ## Description
@@ -15,6 +19,7 @@ This script was inspired by stibinator's [The Great Dismal](https://github.com/s
 
 * [Requirements](#Requirements)
 * [Install](#Install)
+* [Usage](#Usage)
 * [Uninstall](#Uninstall)
 
 ## Requirements
