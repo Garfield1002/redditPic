@@ -1,12 +1,12 @@
-# This code is VERY heavily based on Great Dismal (https://blob.pureandapplied.com.au/greatdismal/)
+# This code is heavily based on Great Dismal (https://blob.pureandapplied.com.au/greatdismal/)
 # Check out stibinator's original work on github: https://github.com/stibinator/GreatDismal
 
 
 # The main function
 function RedditLockscreen{
     param (
-    [string[]]$subreddits = @(),
-    [int]$nsfw,
+    [string[]]$subreddit = @(),
+    [switch]$nsfw,
     [string]$sort,
     [string]$localFolder = (join-path $env:APPDATA "\Reddit backgrounds\"),
     [string]$logfile = (join-path $localFolder "log.txt"),
@@ -16,6 +16,9 @@ function RedditLockscreen{
     [switch]$showlog,
     [switch]$config,
     [switch]$uninstall,
+    [switch]$list,
+    [string[]]$add= @(),
+    [string[]]$remove= @(),
     [switch]$help
     )
 
@@ -26,23 +29,35 @@ function RedditLockscreen{
     $redditPic = Join-Path $localFolder "redditPic.jpg"
 
     if ($install)       { install-RedditLockscreen }
+    elseif ($help)      {funHelp}
     elseif ($showpic)   { Invoke-Item $redditPic }
     elseif ($showLog)   { Get-Content $logfile }
     elseif ($uninstall) { uninstall-RedditLockscreen -localFolder $localFolder}
     elseif ($config)    { Invoke-Item $cfgfile }
-    elseif ($help)      {funHelp}
-    else {
+    elseif ($list)      {$cfg = Get-Content $cfgfile | ConvertFrom-Json; Write-Host 'Current Subreddits: '-ForegroundColor Yellow -BackgroundColor Black; Write-Host $cfg.subreddits -BackgroundColor Black}
+    elseif ($add.Length -ne 0){
+        $cfg = Get-Content $cfgfile | ConvertFrom-Json;
+        $cfg.subreddits += $add.ToLower();
+        $cfg.subreddits = $cfg.subreddits | Select-Object -Unique;
+        set-content $cfgfile ($cfg | ConvertTo-Json);
+        Write-Host ('Successfuly added {0} to your subreddits'-f $add) -ForegroundColor Green -BackgroundColor Black;
+    } elseif ($remove.Length -ne 0){
+        $cfg = Get-Content $cfgfile | ConvertFrom-Json;
+        $cfg.subreddits -= $cfg.subreddits | Where-Object { ! ($remove -contains $_)};
+        set-content $cfgfile ($cfg | ConvertTo-Json);
+        Write-Host ('Successfuly removed {0} from your subreddits'-f $remove) -ForegroundColor Green -BackgroundColor Black;
+    } else {
         # finds a post to use as lock screen
         Write-Host "fetching a post"
 
         # if no subreddits where specified, loads the config
         $cfg = Get-Content $cfgfile | ConvertFrom-Json;
-        if($subreddits.Length -eq 0){$subreddits = $cfg.subreddits;}
-        if($null -eq $nsfw){$nsfw = $cfg.nsfw;}
+        if($subreddit.Length -eq 0){$subreddit = $cfg.subreddits;}
+        if(!$nsfw){$nsfw = ($cfg.nsfw -eq 1);}
         if($null -eq $sort){$sort = $cfg.sort;}
 
         # chooses a random subreddit to load the post from
-        $subredditfortheday = $subreddits[(Get-Random($subreddits.Length))];
+        $subredditfortheday = $subreddit[(Get-Random($subreddit.Length))];
 
         # shuffles the 10 first results
         $result = Invoke-RestMethod -URi  ("https://www.reddit.com/r/{0}/{1}.json?limit=10" -f $subredditfortheday, $sort) -Method Get;
@@ -124,19 +139,15 @@ function install-RedditLockscreen {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){
 
         $str = @('
+        8888888b.               888      888 d8b 888         888                       888
+        888   Y88b              888      888 Y8P 888         888                       888
+        888    888              888      888     888         888                       888
+        888   d88P .d88b.   .d88888  .d88888 888 888888      888      .d88b.   .d8888b 888  888 .d8888b   .d8888b 888d888 .d88b.   .d88b.  88888b.
+        8888888P" d8P  Y8b d88" 888 d88" 888 888 888         888     d88""88b d88P"    888 .88P 88K      d88P"    888P"  d8P  Y8b d8P  Y8b 888 "88b
+        888 T88b  88888888 888  888 888  888 888 888         888     888  888 888      888888K  "Y8888b. 888      888    88888888 88888888 888  888
+        888  T88b Y8b.     Y88b 888 Y88b 888 888 Y88b.       888     Y88..88P Y88b.    888 "88b      X88 Y88b.    888    Y8b.     Y8b.     888  888
+        888   T88b "Y8888   "Y88888  "Y88888 888  "Y888      88888888 "Y88P"   "Y8888P 888  888  88888P"  "Y8888P 888     "Y8888   "Y8888  888  888
 
-
-        8888888b.               888      888 d8b 888         888888b.                     888                                                      888
-        888   Y88b              888      888 Y8P 888         888  "88b                    888                                                      888
-        888    888              888      888     888         888  .88P                    888                                                      888
-        888   d88P .d88b.   .d88888  .d88888 888 888888      8888888K.   8888b.   .d8888b 888  888  .d88b.  888d888 .d88b.  888  888 88888b.   .d88888 .d8888b
-        8888888P" d8P  Y8b d88" 888 d88" 888 888 888         888  "Y88b     "88b d88P"    888 .88P d88P"88b 888P"  d88""88b 888  888 888 "88b d88" 888 88K
-        888 T88b  88888888 888  888 888  888 888 888         888    888 .d888888 888      888888K  888  888 888    888  888 888  888 888  888 888  888 "Y8888b.
-        888  T88b Y8b.     Y88b 888 Y88b 888 888 Y88b.       888   d88P 888  888 Y88b.    888 "88b Y88b 888 888    Y88..88P Y88b 888 888  888 Y88b 888      X88
-        888   T88b "Y8888   "Y88888  "Y88888 888  "Y888      8888888P"  "Y888888  "Y8888P 888  888  "Y88888 888     "Y88P"   "Y88888 888  888  "Y88888  88888P"
-                                                                                                        888
-                                                                                                   Y8b d88P
-                                                                                                    "Y88P"
         ')
         Write-Host $str -ForegroundColor Green
         #write-host ("Author: Garfield1002")
@@ -150,7 +161,7 @@ function install-RedditLockscreen {
         Write-Host
 
         # define the workstation unlock as the trigger
-        $trigger = New-ScheduledTaskTrigger -Daily -At 12pm;
+        # $trigger = New-ScheduledTaskTrigger -Daily -At 12pm;
 
         # create a task scheduler event
         $argument = "-WindowStyle Hidden -command `"import-module 'RedditLockscreen'; RedditLockscreen -logfile {0} -localFolder {1}" -f $logfile, $localFolder
@@ -257,19 +268,28 @@ function logger  {
 }
 
 function funHelp {
-    Write-Host('Usage: RedditLockscreen [-help] [-install] [-showpic] [-showlog] [-config] [-uninstall] [-subreddits] [-sort] [-nsfw]')
-    Write-Host('No args         Fetches a lockscreen image on reddit')
-    Write-Host('-help           Dislay help')
-    Write-Host('-install        Installs the RedditLockscreen script')
-    Write-Host('-showpic        Display the current lockscreen')
-    Write-Host('-showlog        Display the log')
-    Write-Host('-config         Opens the configuration file')
-    Write-Host('-uninstall      Uninstalls the RedditLockscreen script')
-    Write-Host('-subreddits     Specify which subreddits to pick from')
-    Write-Host('-sort           Specify reddit''s sorting method')
-    Write-Host('-nsfw           Specify if nfsw content should be used')
     Write-Host
-    Write-Host('For more information, feel free to go read the README.md at https://github.com/Garfield1002/redditPic/README.MD')
+    Write-Host 'This is a listing of everything you can pass to RedditLockscreen' -BackgroundColor Black
+    Write-Host
+    Write-Host('Usage: RedditLockscreen [-help] [-install] [-showpic] [-showlog] [-config] [-uninstall] [[-subreddit] [-sort] [-nsfw]]') -ForegroundColor Yellow -BackgroundColor Black
+    Write-Host
+    Write-Host 'Commands' -ForegroundColor Green -BackgroundColor Black
+    Write-Host
+    Write-Host('No args             Fetches a lockscreen image on reddit') -BackgroundColor Black
+    Write-Host('-help               Dislay help') -BackgroundColor Black
+    Write-Host('-install            Installs the RedditLockscreen script') -BackgroundColor Black
+    Write-Host('-showpic            Display the current lockscreen') -BackgroundColor Black
+    Write-Host('-showlog            Display the log') -BackgroundColor Black
+    Write-Host('-config             Open the configuration file') -BackgroundColor Black
+    Write-Host('-list               List subreddits in config') -BackgroundColor Black
+    Write-Host('-add xxx            Add a subreddit to the config') -BackgroundColor Black
+    Write-Host('-remove xxx         Remove a subreddit from the config') -BackgroundColor Black
+    Write-Host('-uninstall          Uninstall the RedditLockscreen script') -BackgroundColor Black
+    Write-Host('-subreddit xxx      Specify which subreddit to pick from') -BackgroundColor Black
+    Write-Host('-sort new|hot       Specify reddit''s sorting method') -BackgroundColor Black
+    Write-Host('-nsfw               Specify if nfsw content should be used') -BackgroundColor Black
+    Write-Host
+    Write-Host('For more information, feel free to go read the README.md at https://github.com/Garfield1002/redditPic/README.MD') -BackgroundColor Black
 }
 
 Export-ModuleMember -Function RedditLockscreen;
